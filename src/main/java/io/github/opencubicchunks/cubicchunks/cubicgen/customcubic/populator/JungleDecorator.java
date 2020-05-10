@@ -1,7 +1,7 @@
 /*
  *  This file is part of Cubic World Generation, licensed under the MIT License (MIT).
  *
- *  Copyright (c) 2015 contributors
+ *  Copyright (c) 2015-2020 contributors
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -27,11 +27,13 @@ import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.populator.ICubicPopulator;
 import io.github.opencubicchunks.cubicchunks.api.util.CubePos;
 import io.github.opencubicchunks.cubicchunks.api.world.ICube;
+import io.github.opencubicchunks.cubicchunks.cubicgen.CWGEventFactory;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.gen.feature.WorldGenMelon;
+import net.minecraftforge.event.terraingen.DecorateBiomeEvent;
 
 import java.util.Random;
 
@@ -50,7 +52,9 @@ public class JungleDecorator implements ICubicPopulator {
             int zOffset = random.nextInt(ICube.SIZE) + ICube.SIZE / 2;
             BlockPos blockPos = ((ICubicWorld) world).getSurfaceForCube(pos, xOffset, zOffset, 0, ICubicWorld.SurfaceType.OPAQUE);
             if (blockPos != null) {
-                (new WorldGenMelon()).generate((World) world, random, blockPos);
+                if (CWGEventFactory.decorate(world, random, pos, DecorateBiomeEvent.Decorate.EventType.PUMPKIN)) {
+                    (new WorldGenMelon()).generate(world, random, blockPos);
+                }
             }
         }
 

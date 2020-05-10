@@ -1,7 +1,7 @@
 /*
  *  This file is part of Cubic World Generation, licensed under the MIT License (MIT).
  *
- *  Copyright (c) 2015 contributors
+ *  Copyright (c) 2015-2020 contributors
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -27,12 +27,16 @@ import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
 import io.github.opencubicchunks.cubicchunks.api.worldgen.populator.ICubicPopulator;
 import io.github.opencubicchunks.cubicchunks.api.util.CubePos;
 import io.github.opencubicchunks.cubicchunks.api.world.ICube;
+import io.github.opencubicchunks.cubicchunks.cubicgen.CWGEventFactory;
+import io.github.opencubicchunks.cubicchunks.cubicgen.asm.mixin.common.accessor.IBiome;
+import io.github.opencubicchunks.cubicchunks.cubicgen.asm.mixin.common.accessor.IBiomeTaiga;
 import mcp.MethodsReturnNonnullByDefault;
 import net.minecraft.block.BlockDoublePlant;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.biome.BiomeTaiga;
+import net.minecraftforge.event.terraingen.DecorateBiomeEvent;
 
 import java.util.Random;
 
@@ -43,8 +47,9 @@ import javax.annotation.ParametersAreNonnullByDefault;
 public class TaigaDecorator implements ICubicPopulator {
 
     @Override public void generate(World world, Random random, CubePos pos, Biome biome) {
-        BiomeTaiga taiga = (BiomeTaiga) biome;
-        if ((taiga.type == BiomeTaiga.Type.MEGA || taiga.type == BiomeTaiga.Type.MEGA_SPRUCE)) {
+        IBiomeTaiga taiga = (IBiomeTaiga) biome;
+        if ((taiga.getType() == BiomeTaiga.Type.MEGA || taiga.getType() == BiomeTaiga.Type.MEGA_SPRUCE
+                && CWGEventFactory.decorate(world, random, pos, DecorateBiomeEvent.Decorate.EventType.ROCK))) {
             int count = random.nextInt(3);
 
             for (int i = 0; i < count; ++i) {
@@ -52,19 +57,21 @@ public class TaigaDecorator implements ICubicPopulator {
                 int zOffset = random.nextInt(ICube.SIZE) + ICube.SIZE / 2;
                 BlockPos blockPos = ((ICubicWorld) world).getSurfaceForCube(pos, xOffset, zOffset, 0, ICubicWorld.SurfaceType.SOLID);
                 if (blockPos != null) {
-                    taiga.FOREST_ROCK_GENERATOR.generate((World) world, random, blockPos);
+                    IBiomeTaiga.getForestRockGenerator().generate((World) world, random, blockPos);
                 }
             }
         }
 
-        taiga.DOUBLE_PLANT_GENERATOR.setPlantType(BlockDoublePlant.EnumPlantType.FERN);
+        IBiome.getDoublePlantGenerator().setPlantType(BlockDoublePlant.EnumPlantType.FERN);
 
-        for (int i = 0; i < 7; ++i) {
-            if (random.nextInt(7) != 0) {
-                continue;
+        if (CWGEventFactory.decorate(world, random, pos, DecorateBiomeEvent.Decorate.EventType.FLOWERS)){
+            for (int i = 0; i < 7; ++i) {
+                if (random.nextInt(7) != 0) {
+                    continue;
+                }
+                BlockPos blockPos = pos.randomPopulationPos(random);
+                IBiome.getDoublePlantGenerator().generate(world, random, blockPos);
             }
-            BlockPos blockPos = pos.randomPopulationPos(random);
-            taiga.DOUBLE_PLANT_GENERATOR.generate((World) world, random, blockPos);
         }
     }
 }

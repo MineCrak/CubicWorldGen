@@ -1,7 +1,7 @@
 /*
  *  This file is part of Cubic World Generation, licensed under the MIT License (MIT).
  *
- *  Copyright (c) 2015 contributors
+ *  Copyright (c) 2015-2020 contributors
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -23,14 +23,11 @@
  */
 package io.github.opencubicchunks.cubicchunks.cubicgen.common.gui.component;
 
-import com.google.common.collect.BiMap;
-import com.google.common.collect.HashBiMap;
 import io.github.opencubicchunks.cubicchunks.api.util.MathUtil;
+import io.github.opencubicchunks.cubicchunks.cubicgen.CustomCubicConfig;
 import io.github.opencubicchunks.cubicchunks.cubicgen.common.gui.ExtraGui;
-import net.malisis.core.client.gui.Anchor;
 import net.malisis.core.client.gui.ClipArea;
 import net.malisis.core.client.gui.GuiRenderer;
-import net.malisis.core.client.gui.component.IClipable;
 import net.malisis.core.client.gui.component.UIComponent;
 import net.malisis.core.client.gui.component.container.UIContainer;
 import net.malisis.core.client.gui.component.control.UIScrollBar;
@@ -43,7 +40,7 @@ import java.util.function.IntSupplier;
 import javax.annotation.Nullable;
 
 public abstract class UILayout<T extends UILayout<T>> extends UIContainer<T> {
-    private UIOptionScrollbar scrollbar;
+    private final UIOptionScrollbar scrollbar;
 
     private boolean needsLayoutUpdate = false;
     private int lastSizeX, lastSizeY;
@@ -57,6 +54,11 @@ public abstract class UILayout<T extends UILayout<T>> extends UIContainer<T> {
         this.scrollbar = new UIOptionScrollbar((ExtraGui) getGui(), (T) this, UIScrollBar.Type.VERTICAL);
         this.scrollbar.setVisible(true);
         this.scrollbar.setPosition(6, 0);
+    }
+
+    public T setScrollbarOffset(int offset) {
+        this.scrollbar.setPosition(offset, 0);
+        return self();
     }
 
     @Override public T setRightPadding(int padding) {
@@ -114,6 +116,22 @@ public abstract class UILayout<T extends UILayout<T>> extends UIContainer<T> {
         }
 
         return w;
+    }
+
+    @Override
+    public void calculateContentSize() {
+        int contentWidth = 0;
+        int contentHeight = 0;
+
+        for (UIComponent<?> c : this.components) {
+            if (c.isVisible()) {
+                contentWidth = Math.max(contentWidth, c.getX() + c.getWidth());
+                contentHeight = Math.max(contentHeight, c.getY() + c.getHeight());
+            }
+        }
+
+        this.contentHeight = contentHeight + this.getBottomPadding();
+        this.contentWidth = contentWidth + this.getRightPadding();
     }
 
     public int getAvailableWidth() {
@@ -180,8 +198,8 @@ public abstract class UILayout<T extends UILayout<T>> extends UIContainer<T> {
 
     @Override
     public float getScrollStep() {
-        float contentSize = getContentHeight() - getHeight();
-        float scrollStep = super.getScrollStep() * 1000;
+        float contentSize = scrollbar.isHorizontal() ? getContentWidth() - getWidth() : (getContentHeight() - getHeight());
+        float scrollStep = super.getScrollStep() * CustomCubicConfig.guiScrollStep;
         float scrollFraction = scrollStep / contentSize;
         if (Float.isFinite(scrollFraction) && scrollFraction > 0) {
             return scrollFraction;

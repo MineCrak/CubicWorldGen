@@ -1,7 +1,7 @@
 /*
  *  This file is part of Cubic World Generation, licensed under the MIT License (MIT).
  *
- *  Copyright (c) 2015 contributors
+ *  Copyright (c) 2015-2020 contributors
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -198,9 +198,9 @@ public interface IBuilder {
             throw new UnsupportedOperationException("X and Z scale must be the same!");
         }
         final double/*[]*/[][] gradX = new double/*[scale.getX()]*/[scale.getY()][scale.getZ()];
-        final double[]/*[]*/[] gradY = new double[scale.getX()]/*[scale.getY()]*/[scale.getZ()];
-        final double[][]/*[]*/ gradZ = new double[scale.getX()][scale.getY()]/*[scale.getZ()]*/;
-        final double[][][] vals = new double[scale.getX()][scale.getY()][scale.getZ()];
+        final double[]/*[]*/[] gradY = new double[scale.getZ()]/*[scale.getY()]*/[scale.getX()];
+        final double[][]/*[]*/ gradZ = new double[scale.getY()][scale.getX()]/*[scale.getZ()]*/;
+        final double[][][] vals = new double[scale.getY()][scale.getZ()][scale.getX()];
 
         int xScale = scale.getX();
         int yScale = scale.getY();
@@ -216,21 +216,21 @@ public interface IBuilder {
         int maxX = endUnscaled.getX();
         int maxY = endUnscaled.getY();
         int maxZ = endUnscaled.getZ();
-        for (int sectionX = minX; sectionX < maxX; ++sectionX) {
-            int x = sectionX * xScale;
+        for (int sectionY = minY; sectionY < maxY; ++sectionY) {
+            int y = sectionY * yScale;
             for (int sectionZ = minZ; sectionZ < maxZ; ++sectionZ) {
                 int z = sectionZ * zScale;
-                for (int sectionY = minY; sectionY < maxY; ++sectionY) {
-                    int y = sectionY * yScale;
+                for (int sectionX = minX; sectionX < maxX; ++sectionX) {
+                    int x = sectionX * xScale;
 
-                    final double v000 = this.get(x + xScale * 0, y + yScale * 0, z + zScale * 0);
-                    final double v001 = this.get(x + xScale * 0, y + yScale * 0, z + zScale * 1);
-                    final double v010 = this.get(x + xScale * 0, y + yScale * 1, z + zScale * 0);
-                    final double v011 = this.get(x + xScale * 0, y + yScale * 1, z + zScale * 1);
-                    final double v100 = this.get(x + xScale * 1, y + yScale * 0, z + zScale * 0);
-                    final double v101 = this.get(x + xScale * 1, y + yScale * 0, z + zScale * 1);
-                    final double v110 = this.get(x + xScale * 1, y + yScale * 1, z + zScale * 0);
-                    final double v111 = this.get(x + xScale * 1, y + yScale * 1, z + zScale * 1);
+                    final double v000 = this.get(x, y, z);
+                    final double v001 = this.get(x, y, z + zScale);
+                    final double v010 = this.get(x, y + yScale, z);
+                    final double v011 = this.get(x, y + yScale, z + zScale);
+                    final double v100 = this.get(x + xScale, y, z);
+                    final double v101 = this.get(x + xScale, y, z + zScale);
+                    final double v110 = this.get(x + xScale, y + yScale, z);
+                    final double v111 = this.get(x + xScale, y + yScale, z + zScale);
 
                     double v0y0 = v000;
                     double v0y1 = v001;
@@ -262,11 +262,11 @@ public interface IBuilder {
                             // gradients start
                             final double d_dx__xyz = (v1yz - v0yz) * stepZ;
                             gradX[yRel][xRel] = d_dx__xyz; // for this one x and z are swapped
-                            gradZ[xRel][yRel] = d_dz__xyz;
+                            gradZ[yRel][xRel] = d_dz__xyz;
                             // gradients end
                             for (int zRel = 0; zRel < zScale; ++zRel) {
                                 // to get gradients working, consumer usage moved to later
-                                vals[xRel][yRel][zRel] = vxyz;
+                                vals[yRel][zRel][xRel] = vxyz;
                                 vxyz += d_dz__xyz;
                             }
 
@@ -307,7 +307,7 @@ public interface IBuilder {
 
                             double d_dy__xyz = (vx1z - vx0z) * stepY;
 
-                            gradY[xRel][zRel] = d_dy__xyz;
+                            gradY[zRel][xRel] = d_dy__xyz;
 
                             vx0z += d_dx__x0z;
                             vx1z += d_dx__x1z;
@@ -317,14 +317,13 @@ public interface IBuilder {
                         v10z += d_dz__10z;
                         v11z += d_dz__11z;
                     }
-
-                    for (int xRel = 0; xRel < xScale; ++xRel) {
+                    for (int yRel = 0; yRel < yScale; ++yRel) {
                         for (int zRel = 0; zRel < zScale; ++zRel) {
-                            for (int yRel = 0; yRel < yScale; ++yRel) {
-                                double vxyz = vals[xRel][yRel][zRel];
-                                double d_dx__xyz = gradX[yRel][zRel];
-                                double d_dy__xyz = gradY[xRel][zRel];
-                                double d_dz__xyz = gradZ[xRel][yRel];
+                            double d_dx__xyz = gradX[yRel][zRel];
+                            for (int xRel = 0; xRel < xScale; ++xRel) {
+                                double vxyz = vals[yRel][zRel][xRel];
+                                double d_dy__xyz = gradY[zRel][xRel];
+                                double d_dz__xyz = gradZ[yRel][xRel];
                                 consumer.accept(x + xRel, y + yRel, z + zRel, d_dx__xyz, d_dy__xyz, d_dz__xyz, vxyz);
                             }
                         }

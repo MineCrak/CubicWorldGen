@@ -1,7 +1,7 @@
 /*
  *  This file is part of Cubic World Generation, licensed under the MIT License (MIT).
  *
- *  Copyright (c) 2015 contributors
+ *  Copyright (c) 2015-2020 contributors
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -41,7 +41,6 @@ import net.minecraftforge.registries.IForgeRegistryEntry;
 import net.minecraftforge.registries.RegistryBuilder;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -111,7 +110,7 @@ public final class CubicBiome extends IForgeRegistryEntry.Impl<CubicBiome> {
                         .createForBiome(biome)
                         .defaults()
                         .defaultDecorators()
-                        .setRegistryName(new ResourceLocation(CustomCubicMod.MODID, "unregistered_" + biome.getRegistryName().getResourcePath()))
+                        .setRegistryName(new ResourceLocation(CustomCubicMod.MODID, "unregistered_" + biome.getRegistryName().getPath()))
                         .create();
                 biomeMapping.put(biome, newBiome);
             }

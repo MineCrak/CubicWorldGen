@@ -1,7 +1,7 @@
 /*
  *  This file is part of Cubic World Generation, licensed under the MIT License (MIT).
  *
- *  Copyright (c) 2015 contributors
+ *  Copyright (c) 2015-2020 contributors
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +26,9 @@ package io.github.opencubicchunks.cubicchunks.cubicgen;
 import static io.github.opencubicchunks.cubicchunks.cubicgen.common.biome.CubicBiome.oceanWaterReplacer;
 import static io.github.opencubicchunks.cubicchunks.cubicgen.common.biome.CubicBiome.terrainShapeReplacer;
 
+import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorld;
+import io.github.opencubicchunks.cubicchunks.api.world.ICubicWorldServer;
+import io.github.opencubicchunks.cubicchunks.api.worldgen.ICubeGenerator;
 import io.github.opencubicchunks.cubicchunks.cubicgen.common.biome.CubicBiome;
 import io.github.opencubicchunks.cubicchunks.cubicgen.common.biome.replacer.MesaSurfaceReplacer;
 import io.github.opencubicchunks.cubicchunks.cubicgen.common.biome.replacer.MutatedSavannaSurfaceReplacer;
@@ -33,6 +36,7 @@ import io.github.opencubicchunks.cubicchunks.cubicgen.common.biome.replacer.Swam
 import io.github.opencubicchunks.cubicchunks.cubicgen.common.biome.replacer.TaigaSurfaceReplacer;
 import io.github.opencubicchunks.cubicchunks.cubicgen.customcubic.CustomCubicWorldType;
 import io.github.opencubicchunks.cubicchunks.cubicgen.customcubic.CustomGeneratorSettings;
+import io.github.opencubicchunks.cubicchunks.cubicgen.customcubic.CustomTerrainGenerator;
 import io.github.opencubicchunks.cubicchunks.cubicgen.customcubic.populator.DefaultDecorator;
 import io.github.opencubicchunks.cubicchunks.cubicgen.customcubic.populator.DesertDecorator;
 import io.github.opencubicchunks.cubicchunks.cubicgen.customcubic.populator.ForestDecorator;
@@ -44,7 +48,14 @@ import io.github.opencubicchunks.cubicchunks.cubicgen.customcubic.populator.Swam
 import io.github.opencubicchunks.cubicchunks.cubicgen.customcubic.populator.TaigaDecorator;
 import io.github.opencubicchunks.cubicchunks.cubicgen.flat.FlatCubicWorldType;
 import mcp.MethodsReturnNonnullByDefault;
+import net.minecraft.command.CommandBase;
+import net.minecraft.command.CommandException;
+import net.minecraft.command.ICommandSender;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.world.WorldServer;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.biome.BiomeBeach;
 import net.minecraft.world.biome.BiomeDesert;
@@ -63,16 +74,17 @@ import net.minecraft.world.biome.BiomeSnow;
 import net.minecraft.world.biome.BiomeStoneBeach;
 import net.minecraft.world.biome.BiomeSwamp;
 import net.minecraft.world.biome.BiomeTaiga;
-import net.minecraftforge.common.util.ModFixs;
+import net.minecraftforge.common.DimensionManager;
 import net.minecraftforge.event.RegistryEvent;
-import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.event.FMLPostInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
+import net.minecraftforge.fml.common.event.FMLServerStartingEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.registry.ForgeRegistries;
+import net.minecraftforge.server.permission.DefaultPermissionLevel;
+import net.minecraftforge.server.permission.PermissionAPI;
 import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.core.config.Loggers;
 
 import java.util.function.Consumer;
 
@@ -80,15 +92,18 @@ import javax.annotation.ParametersAreNonnullByDefault;
 
 @ParametersAreNonnullByDefault
 @MethodsReturnNonnullByDefault
-@Mod(modid = CustomCubicMod.MODID)
+@Mod(modid = CustomCubicMod.MODID,
+        dependencies = "required:cubicchunks@[1.12.2-0.0.1015.0,);required:forge@[14.23.3.2658,)",
+        acceptableRemoteVersions = "*",
+        version = CustomCubicMod.VERSION
+)
 @Mod.EventBusSubscriber
 public class CustomCubicMod {
 
     public static final String MODID = "cubicgen";
-
+    public static final String VERSION = "0.0.9999.0";
     public static final String MALISIS_VERSION = "@@MALISIS_VERSION@@";
 
-    public static final int FIXER_VERSION = 2;
     public static final boolean DEBUG_ENABLED = false;
     public static Logger LOGGER = null;
 
@@ -101,9 +116,53 @@ public class CustomCubicMod {
         CustomCubicWorldType.create();
         DebugWorldType.create();
 
+    }
 
-        ModFixs fixes = FMLCommonHandler.instance().getDataFixer().init(MODID, FIXER_VERSION);
-        CustomGeneratorSettings.registerDataFixers(fixes);
+    @Mod.EventHandler
+    public void serverStarting(FMLServerStartingEvent evt)
+    {
+        PermissionAPI.registerNode(MODID + ".command.reload_preset", DefaultPermissionLevel.OP, "Allows to run the /customcubic_reload command");
+
+        evt.registerServerCommand(new CommandBase() {
+            @Override
+            public String getName() {
+                return "customcubic_reload";
+            }
+
+            @Override
+            public String getUsage(ICommandSender sender) {
+                return "/customcubic_reload";
+            }
+
+            @Override
+            public void execute(MinecraftServer server, ICommandSender sender, String[] args) throws CommandException {
+                for (WorldServer world : DimensionManager.getWorlds()) {
+                    if (world == null || !((ICubicWorld) world).isCubicWorld()) {
+                        continue;
+                    }
+                    ICubeGenerator cubeGenerator = ((ICubicWorldServer) world).getCubeGenerator();
+                    if (!(cubeGenerator instanceof CustomTerrainGenerator)) {
+                        continue;
+                    }
+                    String settings = CustomGeneratorSettings.loadJsonStringFromSaveFolder(world.getSaveHandler());
+                    if (settings == null) {
+                        sender.sendMessage(new TextComponentString("ERROR: loading preset failed (does the file exist?). Not reloading preset."));
+                        continue;
+                    }
+                    ((CustomTerrainGenerator) cubeGenerator).reloadPreset(settings);
+                    sender.sendMessage(new TextComponentString("Preset for dimension " + world.provider.getDimension() + " has been reloaded. Note that this may cause issues with mods."));
+                }
+            }
+
+            @Override
+            public boolean checkPermission(MinecraftServer server, ICommandSender sender) {
+                if (sender instanceof EntityPlayer) {
+                    return PermissionAPI.hasPermission((EntityPlayer) sender, MODID + ".command.reload_preset");
+                } else {
+                    return super.checkPermission(server, sender);
+                }
+            }
+        });
     }
 
     @Mod.EventHandler
@@ -179,11 +238,11 @@ public class CustomCubicMod {
 
     private static void autoRegister(RegistryEvent.Register<CubicBiome> event, Class<? extends Biome> cl, Consumer<CubicBiome.Builder> cons) {
         ForgeRegistries.BIOMES.getValues().stream()
-                .filter(x -> x.getRegistryName().getResourceDomain().equals("minecraft"))
+                .filter(x -> x.getRegistryName().getNamespace().equals("minecraft"))
                 .filter(x -> x.getClass() == cl).forEach(b -> {
             CubicBiome.Builder builder = CubicBiome.createForBiome(b);
             cons.accept(builder);
-            CubicBiome biome = builder.defaultPostDecorators().setRegistryName(MODID, b.getRegistryName().getResourcePath()).create();
+            CubicBiome biome = builder.defaultPostDecorators().setRegistryName(MODID, b.getRegistryName().getPath()).create();
             event.getRegistry().register(biome);
         });
     }

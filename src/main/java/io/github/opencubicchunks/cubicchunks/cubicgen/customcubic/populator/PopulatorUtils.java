@@ -1,7 +1,7 @@
 /*
  *  This file is part of Cubic World Generation, licensed under the MIT License (MIT).
  *
- *  Copyright (c) 2015 contributors
+ *  Copyright (c) 2015-2020 contributors
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -23,8 +23,6 @@
  */
 package io.github.opencubicchunks.cubicchunks.cubicgen.customcubic.populator;
 
-import static io.github.opencubicchunks.cubicchunks.api.util.Coords.blockToCube;
-
 import io.github.opencubicchunks.cubicchunks.api.util.CubePos;
 import io.github.opencubicchunks.cubicchunks.api.util.MathUtil;
 import io.github.opencubicchunks.cubicchunks.api.world.ICube;
@@ -34,43 +32,51 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraft.world.gen.feature.WorldGenerator;
 
-import java.util.Random;
-
+import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
+import java.util.Random;
+import java.util.function.BiPredicate;
 
 @ParametersAreNonnullByDefault
 @MethodsReturnNonnullByDefault
 public class PopulatorUtils {
 
     public static void genOreUniform(World world, CustomGeneratorSettings cfg, Random random, CubePos pos,
-            int count, double probability, WorldGenerator generator, double minY, double maxY) {
+                                     @Nullable CustomGeneratorSettings.GenerationCondition condition,
+                                     int count, double probability, WorldGenerator generator, double minY, double maxY) {
         int minBlockY = Math.round((float) (minY * cfg.expectedHeightVariation + cfg.expectedBaseHeight));
         int maxBlockY = Math.round((float) (maxY * cfg.expectedHeightVariation + cfg.expectedBaseHeight));
-        if (pos.getMinBlockY() > maxBlockY || pos.getMaxBlockY() < minBlockY) {
+        final int offset = ICube.SIZE / 2;
+        if (pos.getMinBlockY() + offset > maxBlockY || pos.getMaxBlockY() + offset < minBlockY) {
             return;
         }
         for (int i = 0; i < count; ++i) {
             if (random.nextDouble() > probability) {
                 continue;
             }
-            int yOffset = random.nextInt(ICube.SIZE) + ICube.SIZE / 2;
+            int yOffset = random.nextInt(ICube.SIZE) + offset;
             int blockY = pos.getMinBlockY() + yOffset;
             if (blockY > maxBlockY || blockY < minBlockY) {
                 continue;
             }
-            int xOffset = random.nextInt(ICube.SIZE);
-            int zOffset = random.nextInt(ICube.SIZE);
-            generator.generate((World) world, random, new BlockPos(pos.getMinBlockX() + xOffset, blockY, pos.getMinBlockZ() + zOffset));
+            int xOffset = random.nextInt(ICube.SIZE) + offset;
+            int zOffset = random.nextInt(ICube.SIZE) + offset;
+            BlockPos position = new BlockPos(pos.getMinBlockX() + xOffset, blockY, pos.getMinBlockZ() + zOffset);
+            if (condition == null || condition.canGenerate(random, world, position)) {
+                generator.generate(world, random, position);
+            }
         }
     }
 
-    public static void genOreBellCurve(World world, CustomGeneratorSettings cfg, Random random, CubePos pos, int count,
-                                      double probability, WorldGenerator generator, double mean, double stdDevFactor, double spacing, double minY, double maxY) {
+    public static void genOreBellCurve(World world, CustomGeneratorSettings cfg, Random random, CubePos pos,
+                                       @Nullable CustomGeneratorSettings.GenerationCondition condition, int count,
+                                       double probability, WorldGenerator generator, double mean,
+                                       double stdDevFactor, double spacing, double minY, double maxY) {
 
         int minBlockY = Math.round((float) (minY * cfg.expectedHeightVariation + cfg.expectedBaseHeight));
         int maxBlockY = Math.round((float) (maxY * cfg.expectedHeightVariation + cfg.expectedBaseHeight));
         //temporary fix for slider becoming 0 at minimum position
-        if(spacing == 0.0){
+        if (spacing == 0.0) {
             spacing = 0.5;
         }
         int iSpacing = Math.round((float) (spacing * cfg.expectedHeightVariation));
@@ -88,9 +94,12 @@ public class PopulatorUtils {
             if (random.nextDouble() > (probability * modifier)) {
                 continue;
             }
-            int xOffset = random.nextInt(ICube.SIZE);
-            int zOffset = random.nextInt(ICube.SIZE);
-            generator.generate((World) world, random, new BlockPos(pos.getMinBlockX() + xOffset, blockY, pos.getMinBlockZ() + zOffset));
+            int xOffset = random.nextInt(ICube.SIZE) + ICube.SIZE / 2;
+            int zOffset = random.nextInt(ICube.SIZE) + ICube.SIZE / 2;
+            BlockPos position = new BlockPos(pos.getMinBlockX() + xOffset, blockY, pos.getMinBlockZ() + zOffset);
+            if (condition == null || condition.canGenerate(random, world, position)) {
+                generator.generate(world, random, position);
+            }
         }
     }
 }
